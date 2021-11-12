@@ -7,6 +7,8 @@ import importlib
 import logging
 import warnings
 import os
+import time as tm
+
 import sys
 
 # third party imports
@@ -208,10 +210,13 @@ def _solve(inputs_dafi, inverse, model):
             log_message = f"\n  Iteration: {iteration}"
             logger.log(_log_level(2), log_message)
 
+            ts = tm.time()
             # map the state vector to observation space
             if iteration != 0:
                 state_forecast = state_analysis.copy()
             state_in_obsspace = model.state_to_observation(state_forecast)
+            print(f'      Ensemble of forecast ... {tm.time()-ts:.2f}s')
+
             if iteration == 0:
                 state_in_obsspace_prior = state_in_obsspace
 
@@ -221,9 +226,43 @@ def _solve(inputs_dafi, inverse, model):
                     obs_vec, obs_error, inputs_dafi['nsamples'])
 
             # data assimilaton
+            ts = tm.time()
+            # inflation
+            if iteration == 0 and inverse.inflation_flag:
+                coeff = 1 / np.sqrt(inputs_dafi['nsamples'] - 1.0)
+                Sd = coeff * (state_in_obsspace - state_in_obsspace.mean(axis=0))
+                gamma = np.sqrt(np.trace(Sd.dot(Sd.T))) / inputs_dafi['nsamples']
+                inverse.gamma = np.sqrt(np.trace(Sd.dot(Sd.T))) / inputs_dafi['nsamples']
+            elif iteration != 0 and inverse.inflation_flag:
+                inverse.gamma = inverse.gamma * inverse.beta
+            else:
+                inverse.gamma = 1
+            
+            # correlation-based localization
+            if iteration == 0 and inverse.localization_flag:
+                Dx = state_prior - state_prior.mean(axis=0)
+                hx = np.linalg.inv(np.sqrt(obs_error)).dot(state_in_obsspace_prior)
+                Dhx = hx - hx.mean(axis=0)
+                cov = (1.0 / (inputs_dafi['nsamples'])) * Dx.dot(Dhx.T)
+                corr = np.ones(cov.shape)
+                corr = np.corrcoef(state_prior, hx)
+                count = 0
+                for k in range(cov.shape[0]):
+                    for s in range(cov.shape[1]):
+                        tau = inverse.tau
+                        theta = tau / np.sqrt(inputs_dafi['nsamples'])
+                        if abs(corr[k, s]) < theta:
+                            count += 1
+                            inverse.corr[k, s] = 0
+
+                print(f'      number of zero value ... {count}')
+
+                np.savetxt('corr.txt', inverse.corr)
+
             state_analysis = inverse.analysis(
                 iteration, state_forecast, state_in_obsspace, obs, obs_error,
                 obs_vec)
+            print(f'      Data assimilation analysis ... {tm.time()-ts:.2f}s')
 
             # save results
             if inputs_dafi['save_level'] in {'iter', 'debug'}:
@@ -242,6 +281,33 @@ def _solve(inputs_dafi, inverse, model):
             diff = obs - state_in_obsspace
             misfit_norm = np.linalg.norm(np.mean(diff, axis=1))
             misfit_list.append(misfit_norm)
+
+            # inflation
+            if inverse.inflation_flag and misfit_list[iteration] > misfit_list[iteration-1]:
+                dir = os.path.join(tdir, 'xf')
+                state_forecast = np.loadtxt(dir + '/xf_{}'.format(iteration-1))
+                for loop in range(5): # TODO: put 5 in inputfile
+                    # log
+                    print(f'      Inner iteration: {loop}')
+                    inverse.gamma = inverse.gamma * inverse.alpha
+                    dir = os.path.join(tdir, 'Hx')
+                    state_in_obsspace = np.loadtxt(dir + '/Hx_{}'.format(iteration-1)) # model.state_to_observation(state_forecast)
+
+                    # perturb observations
+                    if inputs_dafi['perturb_obs_option'] == 'iter':
+                        obs, obs_perturbation = _perturb_vec(
+                            obs_vec, obs_error, inputs_dafi['nsamples'])
+
+                    diff = obs - state_in_obsspace
+                    misfit_norm = np.linalg.norm(np.mean(diff, axis=1))
+                    if misfit_norm < misfit_list[iteration-1]:
+                        misfit_list[iteration] = misfit_norm
+                        break
+                    state_analysis = inverse.analysis(
+                        iteration, state_forecast, state_in_obsspace, obs, obs_error,
+                        obs_vec)
+            print(f'      misfit = ... {misfit_norm}s')
+
             conv, log_message, (residual, noise) = _convergence(
                 misfit_list, obs_error, inputs_dafi['convergence_factor'],
                 inputs_dafi['convergence_residual'],
