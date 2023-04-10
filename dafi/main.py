@@ -228,37 +228,19 @@ def _solve(inputs_dafi, inverse, model):
             # data assimilaton
             ts = tm.time()
             # inflation
-            if iteration == 0 and inverse.inflation_flag:
-                coeff = 1 / np.sqrt(inputs_dafi['nsamples'] - 1.0)
-                Sd = coeff * (state_in_obsspace - state_in_obsspace.mean(axis=0))
-                gamma = np.sqrt(np.trace(Sd.dot(Sd.T))) / inputs_dafi['nsamples']
-                inverse.gamma = np.sqrt(np.trace(Sd.dot(Sd.T))) / inputs_dafi['nsamples']
-            elif iteration != 0 and inverse.inflation_flag:
-                inverse.gamma = inverse.gamma * inverse.beta
-            else:
-                inverse.gamma = 1
-            
-            # correlation-based localization
-            if iteration == 0 and inverse.localization_flag:
-                Dx = state_prior - state_prior.mean(axis=0)
-                hx = np.linalg.inv(np.sqrt(obs_error)).dot(state_in_obsspace_prior)
-                Dhx = hx - hx.mean(axis=0)
-                cov = (1.0 / (inputs_dafi['nsamples'])) * Dx.dot(Dhx.T)
-                corr = np.ones(cov.shape)
-                corr = np.corrcoef(state_prior, hx)
-                count = 0
-                for k in range(cov.shape[0]):
-                    for s in range(cov.shape[1]):
-                        tau = inverse.tau
-                        theta = tau / np.sqrt(inputs_dafi['nsamples'])
-                        if abs(corr[k, s]) < theta:
-                            count += 1
-                            inverse.corr[k, s] = 0
-
-                print(f'      number of zero value ... {count}')
-
-                np.savetxt('corr.txt', inverse.corr)
-
+            if inverse.inflation_flag:
+                if iteration == 0:
+                    inverse.gamma = inverse.gamma
+                elif iteration == 1:
+                    coeff = 1.0 / np.sqrt(inputs_dafi['nsamples'] - 1.0)
+                    Sd = coeff * (state_in_obsspace - state_in_obsspace.mean(axis=1,keepdims=1))
+                    Sd_norm = np.sqrt(np.linalg.inv(obs_error)).dot(Sd)
+                    inverse.gamma *= np.trace(Sd_norm.dot(Sd_norm.T)) / len(obs_vec)
+                elif iteration != 1:
+                    inverse.gamma = inverse.gamma * inverse.beta
+            # else:
+                # inverse.gamma = 1
+            print(inverse.gamma)
             state_analysis = inverse.analysis(
                 iteration, state_forecast, state_in_obsspace, obs, obs_error,
                 obs_vec)
@@ -291,7 +273,7 @@ def _solve(inputs_dafi, inverse, model):
                     print(f'      Inner iteration: {loop}')
                     inverse.gamma = inverse.gamma * inverse.alpha
                     dir = os.path.join(tdir, 'Hx')
-                    state_in_obsspace = np.loadtxt(dir + '/Hx_{}'.format(iteration-1)) # model.state_to_observation(state_forecast)
+                    state_in_obsspace = np.loadtxt(dir + '/Hx_{}'.format(iteration-1)) 
 
                     # perturb observations
                     if inputs_dafi['perturb_obs_option'] == 'iter':

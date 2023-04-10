@@ -368,8 +368,8 @@ class REnKF(InverseMethod):
         return state_analysis
 
 # child classes (developing)
-class LM_EnRML(InverseMethod):
-    """ Implementation of the localized ensemble method (LM_EnRML).
+class AD_EnKF(InverseMethod):
+    """ Implementation of the adaptive-stepping ensemble Kalman method (AD_EnKF).
 
     :math:`x_f` is the forecasted state vector (by the forward model),
     :math:`x_a` is the updated vector after data-assimilation,
@@ -381,7 +381,7 @@ class LM_EnRML(InverseMethod):
     def __init__(self, inputs_dafi, inputs):
         """ See  :py:meth:`InverseMethod.__init__` for details. """
         super(self.__class__, self).__init__(inputs_dafi, inputs)
-        self.name = 'LM Ensemble Randomized Maximum Likelihood (LM-EnRML)'
+        self.name = 'Adaptive-stepping Ensemble Kalman Method (AD-EnKF)'
         self.inflation_flag = inputs['inflation_flag']
         self.localization_flag = inputs['localization_flag']
         self.alpha = inputs['alpha']
@@ -397,7 +397,7 @@ class LM_EnRML(InverseMethod):
 
     def analysis(self, iteration, state_forecast, state_in_obsspace, obs,
                  obs_error, obs_vec, corr=None):
-        """ Correct the forecast ensemble states using EnKF.
+        """ Correct the forecast ensemble states using AD-EnKF.
 
         See :py:meth:`InverseMethod.analysis` for I/O details.
         """
