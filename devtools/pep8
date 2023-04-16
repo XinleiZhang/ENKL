@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-
-autopep8 -d $1 | colordiff
-
