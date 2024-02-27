@@ -19,7 +19,7 @@ simulationType RAS;
 
 RAS
 {
-    RASModel        kEpsilonNNQuadraticTrain;
+    RASModel        PykEpsilonNNQuadraticTrain;
 
     turbulence      on;
 

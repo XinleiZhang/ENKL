@@ -1,9 +1,9 @@
 
 dafi:
-    model_file: nnfoam.py
-    inverse_method: AS_EnKF
-    nsamples: 20
-    max_iterations: 20
+    model_file: nnfoam_EnVar.py
+    inverse_method: EnVar
+    nsamples: 50
+    max_iterations: 100
     rand_seed: 1
     verbosity: 2
     convergence_option: max
@@ -13,20 +13,23 @@ dafi:
 inverse:
     inflation_flag: 1
     localization_flag: 0
-    nstate: 69
+    nstate: 184
     nobs: 7500
     alpha: 1.2
     beta: 0.8
     gamma: 1.0
+    r1: 0.2
+    r2: 0.2
 
 model:
     foam_case: nnfoam_inputs/foam_base
     iteration_nstep: 500
-    weight_baseline_file: nnfoam_inputs/w.0
+    weight_baseline_file: nnfoam_inputs/foam_base/nn_weights_flatten.dat
     nut_base_foamfile: nnfoam_inputs/foam_base/0.orig/nut
-    ncpu: 50
+    ncpu: 16
     obs_file: nnfoam_inputs/data/foam_synthetic_truth/10000/U
     iteration_step_length: 1.0
+    nn_model: 
 
     # architecture
     nscalar_invariants: 2
@@ -44,7 +47,7 @@ model:
 
     # training flows and measurements
     parallel: False
-    rel_stddev: 0.5
-    abs_stddev: 0.01
-    obs_rel_std: 0.01
-    obs_abs_std: 0.00001
+    rel_stddev: 0.05
+    abs_stddev: 0.001
+    obs_rel_std: 0.01 
+    obs_abs_std: 0.00001 
