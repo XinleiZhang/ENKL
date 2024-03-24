@@ -240,7 +240,7 @@ def _solve(inputs_dafi, inverse, model):
                     inverse.gamma = inverse.gamma * inverse.beta
             # else:
                 # inverse.gamma = 1
-            print(inverse.gamma)
+                print(inverse.gamma)
             state_analysis = inverse.analysis(
                 iteration, state_forecast, state_in_obsspace, obs, obs_error,
                 obs_vec)
@@ -260,7 +260,10 @@ def _solve(inputs_dafi, inverse, model):
                     np.savetxt(os.path.join(dir, file), val)
 
             # check convergence
-            diff = obs - state_in_obsspace
+            if inverse.name == 'Ensemble-based variational approach (EnVar)':
+                diff = state_in_obsspace[:,:] - obs_vec.reshape(-1,1)
+            else:
+                diff = obs - state_in_obsspace
             misfit_norm = np.linalg.norm(np.mean(diff, axis=1))
             misfit_list.append(misfit_norm)
 

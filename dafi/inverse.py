@@ -426,7 +426,64 @@ class AD_EnKF(InverseMethod):
             self._save_debug(debug_dict, iteration)
         return state_analysis
 
+class EnVar(InverseMethod):
+    """ Implementation of the ensemble-based variational approach.
 
+    The EnVar is updated by: :math:`w_a = ((Nens-1)I+H.T*R^-1*H)^-1*H^T(y-h(xf)))` where
+    :math:`x_f` is the forecasted state vector (by the forward model),
+    :math:`x_a` is the updated vector after data-assimilation,
+    
+    The last sample is the mean of the samples.
+    """
+
+    def __init__(self, inputs_dafi, inputs):
+        """ See  :py:meth:`InverseMethod.__init__` for details. """
+        super(self.__class__, self).__init__(inputs_dafi, inputs)
+        self.name = 'Ensemble-based variational approach (EnVar)'
+        self.inflation_flag_inner = inputs.get('inflation_flag_inner', 0)
+        self.loss = 0.0
+        
+        self.r1 = inputs.get('r1', 0.1)
+        self.r2 = inputs.get('r2', 0.1)
+
+
+    def analysis(self, iteration, state_forecast, state_in_obsspace, obs,
+                 obs_error, obs_vec):
+        """ Correct the forecast ensemble states using EnVar.
+
+        See :py:meth:`InverseMethod.analysis` for I/O details.
+        """
+        R = obs_error
+        Nens = self.nsamples
+        x = state_forecast[:,-1].reshape((-1,1)) # x_forecast_mean
+        Q = state_forecast[:,:-1] - x # (xj-xf)
+        Hf = state_in_obsspace[:,-1].reshape((-1,1)) #h(xf)
+        
+        H = state_in_obsspace[:,:-1] - Hf
+        HTRi = H.T @ np.linalg.inv(R)
+        HTRiH = HTRi @ H
+        Linv = np.linalg.inv( (Nens - 1.0)*np.eye(Nens) +  HTRiH ) 
+        dx = Q @ ( Linv @  (HTRi) @ (np.array([obs_vec]).T - Hf) )
+        xa = x + dx
+        Lisq1  = sqrtm(Linv)*np.sqrt(Nens-1)
+        if iteration > 0 :
+            gamma = np.linalg.norm((np.array([obs_vec]).T - Hf))/self.loss
+            beta = 1+self.r1 - self.r2/(gamma+1)
+        else:
+            beta = 1.0
+        self.loss = np.linalg.norm((np.array([obs_vec]).T - Hf))
+        Q = beta * Q @ Lisq1 if self.inflation_flag_inner else Q @ Lisq1
+        Q = Q - Q.mean(axis=1).reshape(-1,1)
+        
+        # debug
+        if self._debug:
+            debug_dict = {
+                 'Linv': Linv, 'HATRiHA': HTRiH, 'HA': H,
+                'dx': dx, 'beta': beta}
+            self._save_debug(debug_dict, iteration)
+        
+        return np.hstack((Q + xa,xa))    
+    
 # functions
 def _check_condition_number(mat, name='matrix', eps=1e16,):
     """ Calculate the condition number of a matrix and check it is below
@@ -449,3 +506,10 @@ def _mean_subtracted_matrix(mat, samp_axis=1,):
     mean_vec = np.tile(mean_vec, (1, nsamps))
     mean_sub_mat = mat - mean_vec
     return mean_sub_mat
+
+def sqrtm(L):
+    v,d = np.linalg.eigh(L)
+    v = np.real(v)
+    d = np.real(d)
+    Lsqrt = d @ np.diag(np.sqrt(np.abs(v))) @ d.T
+    return Lsqrt
