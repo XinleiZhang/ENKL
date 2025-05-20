@@ -1,4 +1,7 @@
-# Neural network, permutation feature importance (PFI) evaluation, and symbolic regression using AI Feynman
+# Efficient learning of symbolic turbulence models via neural networks
 
 # To use this code, you may need
 - AI Feynman
+- DAFI
+
+The code will be updated soon.
