@@ -14,6 +14,6 @@ Finally, the AI Feynman is used to reveal symbolic expression from neural networ
 
 We provide two cases, the square duct flow and the periodic hill. In each folder, a DAFI trained neural network is provided, so as the input-output data table. A Python code that calculates PFI value and run AI Feynman that reveals symbolic regression is provided. 
 
-To use this code, please first refer to literature 
+It is suggested to read the literature before using the code. 
 [Chutian Wu, Xin-Lei Zhang, Duo Xu, Guowei He, A framework for learning symbolic turbulence models from indirect observation data via neural networks and feature importance analysis, Journal of Computational Physics, Volume 537, 2025, 114068,ISSN 0021-9991](https://doi.org/10.1016/j.jcp.2025.114068)
 
