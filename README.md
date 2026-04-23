@@ -4,9 +4,9 @@ EnKL-Ensemble-based Kalman Learning for data-driven turbulence modeling
 This is a forked version of the [DAFI](https://dafi.readthedocs.io) code with focus on machine learning-augmented turbulence modeling.
 
 ### Additional features 
-This code is built on the [DAFI](https://dafi.readthedocs.io) code and provides the following additional features.
-- The ensemble variational method is added (see Folder: test_cases/sqDuct). Details are referred to [1].
-- The feature importance analysis and symbolic regression methods are added to enable learning symbolic turbulence models (see Folder: metamodel). Details are referred to [2].
+This code is built on [DAFI](https://dafi.readthedocs.io) and provides the following additional features.
+- The ensemble-based variational method is added to improve the training efficiency (see Folder: test_cases/sqDuct). Details are referred to [1].
+- The feature importance analysis and symbolic regression methods are added to enable learning symbolic turbulence models from sparse indirect data (see Folder: metamodel). Details are referred to [2].
 - The physics-constrained machine learning method is being added to learn generalizable turbulence models across different flow scenarios(under development).
 
 ## List of publications using this code:
