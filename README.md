@@ -5,7 +5,7 @@ This is a forked version of DAFI code with focus on machine learning-augmented t
 
 ### Additional features 
 This code is built on the original DAFI code and provides the following additional features.
-- The ensemble variational method is added (see Folder: test_cases/sqDuct). Details are referred to Ref[1].
+- The ensemble variational method is added (see Folder: test_cases/sqDuct). Details are referred to [1].
 - The feature importance analysis and symbolic regression methods are added to enable learning symbolic turbulence models (see Folder: metamodel). Details are referred to [2].
 - The physics-constrained machine learning method is being added to learn generalizable turbulence models across different flow scenarios(under development).
 
