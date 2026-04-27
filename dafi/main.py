@@ -214,7 +214,7 @@ def _solve(inputs_dafi, inverse, model):
             # map the state vector to observation space
             if iteration != 0:
                 state_forecast = state_analysis.copy()
-            state_in_obsspace = model.state_to_observation(state_forecast)
+            state_in_obsspace, state_forecast = model.state_to_observation(state_forecast)
             print(f'      Ensemble of forecast ... {tm.time()-ts:.2f}s')
 
             if iteration == 0:
@@ -329,7 +329,7 @@ def _solve(inputs_dafi, inverse, model):
             log_message = "\n  Mapping final analysis states " + \
                 "to observation space."
             logger.log(_log_level(2), log_message)
-            state_in_obsspace = model.state_to_observation(state_analysis)
+            state_in_obsspace, state_analysis = model.state_to_observation(state_analysis)
             if inputs_dafi['save_level'] in {'iter', 'debug'}:
                 dir = os.path.join(tdir, 'Hx')
                 file = 'Hxa'
