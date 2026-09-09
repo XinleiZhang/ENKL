@@ -484,6 +484,95 @@ class EnVar(InverseMethod):
         
         return np.hstack((Q + xa,xa))    
     
+class CREnKF(InverseMethod):
+    """ Implementation of the constrained regularized ensemble Kalman
+    filter (CREnKF).
+
+    The analysis consists of three successive EnKF updates:
+      1. A standard EnKF + inflation using the velocity observations.
+      2. An EnKF + inflation using the first set of physical
+         G-constraint observations.
+      3. An EnKF + inflation using the second set of physical
+         G-constraint observations.
+
+    The G-constraints are supplied by the physics model through its
+    ``compute_g_constraint()`` method. The model object must be passed
+    to the inverse method through the ``inputs`` dictionary using the
+    key ``'model'``. Inflation is applied internally after every update
+    when ``inflation_flag`` is enabled.
+    """
+
+    def __init__(self, inputs_dafi, inputs):
+        """ See :py:meth:`InverseMethod.__init__` for details. """
+        super(self.__class__, self).__init__(inputs_dafi, inputs)
+        self.name = 'Constrained Regularized Ensemble Kalman Filter (CREnKF)'
+        self.inflation_flag = inputs.get('inflation_flag', 0)
+        self.alpha = inputs.get('alpha', 1.01)
+        self.lambda_g = inputs.get('lambda_g', 0.1)
+        self.model = inputs.get('model', None)
+
+    def analysis(self, iteration, state_forecast, state_in_obsspace, obs,
+                 obs_error, obs_vec):
+        """ Correct the forecast ensemble states using CREnKF.
+
+        See :py:meth:`InverseMethod.analysis` for I/O details.
+        """
+        # stage 1: EnKF with the velocity observations, then inflate
+        state_analysis = self._enkf_core(
+            state_forecast, state_in_obsspace, obs, obs_error, obs_vec,
+        )
+        if self.inflation_flag:
+            state_analysis = self._inflation(state_analysis)
+
+        # stages 2 and 3: two G-constraint EnKF updates, inflate each
+        if self.model is not None:
+            for _ in range(2):
+                g_obs, R_g, obs_vec_g = self.model.compute_g_constraint()
+                state_analysis = self._enkf_core(
+                    state_analysis, g_obs, np.zeros_like(g_obs), R_g, obs_vec_g,
+                )
+                if self.inflation_flag:
+                    state_analysis = self._inflation(state_analysis)
+
+        return state_analysis
+
+    def _enkf_core(self, state_forecast, state_in_obsspace, obs,
+                   obs_error, obs_vec):
+        """ EnKF core update shared by all three stages.
+
+        Corresponds to the standard EnKF:
+            K = PHt * (R + HPHt)^{-1}
+            x_a = x_f + K * (y - Hx)
+        """
+        xp = _mean_subtracted_matrix(state_forecast)
+        hxp = _mean_subtracted_matrix(state_in_obsspace)
+        coeff = 1.0 / (self.nsamples - 1.0)
+        pht = coeff * np.dot(xp, hxp.T)
+        hpht = coeff * np.dot(hxp, hxp.T)
+
+        hpht_R = hpht + obs_error
+        inv = np.linalg.inv(hpht_R)
+        kalman_gain_matrix = np.dot(pht, inv)
+
+        dx = np.dot(kalman_gain_matrix, obs - state_in_obsspace)
+        state_analysis = state_forecast + dx
+
+        return state_analysis
+
+    def _inflation(self, state):
+        """ Apply inflation to the ensemble.
+
+        Corresponds to:
+            x = alpha * x + (1 - alpha) * mean(x)
+        """
+        state_mean = np.mean(state, axis=1, keepdims=True)
+        state = self.alpha * state + (1.0 - self.alpha) * state_mean
+        return state
+
+    def __str__(self):
+        return self.name
+
+
 # functions
 def _check_condition_number(mat, name='matrix', eps=1e16,):
     """ Calculate the condition number of a matrix and check it is below

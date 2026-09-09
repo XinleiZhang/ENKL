@@ -143,6 +143,10 @@ def run(model_file, inverse_method, nsamples, ntime=None,
     model = Model(inputs_dafi, inputs_model)
 
     # initialize inverse method
+    # pass the model object to the inverse method (needed by CREnKF
+    # to evaluate G-constraints via model.compute_g_constraint())
+    if inverse_method == 'CREnKF':
+        inputs_inverse['model'] = model
     Inverse = getattr(
         importlib.import_module('dafi.inverse'), inverse_method)
     inverse = Inverse(inputs_dafi, inputs_inverse)
@@ -174,6 +178,10 @@ def _solve(inputs_dafi, inverse, model):
     # time and iteration arrays
     time_array = np.arange(inputs_dafi['ntime'], dtype=int)
     iteration_array = np.arange(inputs_dafi['max_iterations'], dtype=int)
+
+    # the CREnKF method handles inflation internally and its model
+    # returns a single value from state_to_observation
+    is_crenkf = inputs_dafi['inverse_method'] == 'CREnKF'
 
     # initial ensemble
     state_forecast = model.generate_ensemble()
@@ -214,7 +222,11 @@ def _solve(inputs_dafi, inverse, model):
             # map the state vector to observation space
             if iteration != 0:
                 state_forecast = state_analysis.copy()
-            state_in_obsspace, state_forecast = model.state_to_observation(state_forecast)
+            state_to_obs_out = model.state_to_observation(state_forecast)
+            if is_crenkf:
+                state_in_obsspace = state_to_obs_out
+            else:
+                state_in_obsspace, state_forecast = state_to_obs_out
             print(f'      Ensemble of forecast ... {tm.time()-ts:.2f}s')
 
             if iteration == 0:
@@ -228,7 +240,7 @@ def _solve(inputs_dafi, inverse, model):
             # data assimilaton
             ts = tm.time()
             # inflation
-            if inverse.inflation_flag:
+            if inverse.inflation_flag and not is_crenkf:
                 if iteration == 0:
                     inverse.gamma = inverse.gamma
                 elif iteration == 1:
@@ -268,7 +280,7 @@ def _solve(inputs_dafi, inverse, model):
             misfit_list.append(misfit_norm)
 
             # inflation
-            if inverse.inflation_flag and misfit_list[iteration] > misfit_list[iteration-1]:
+            if inverse.inflation_flag and not is_crenkf and misfit_list[iteration] > misfit_list[iteration-1]:
                 dir = os.path.join(tdir, 'xf')
                 state_forecast = np.loadtxt(dir + '/xf_{}'.format(iteration-1))
                 for loop in range(5): # TODO: put 5 in inputfile
@@ -329,7 +341,11 @@ def _solve(inputs_dafi, inverse, model):
             log_message = "\n  Mapping final analysis states " + \
                 "to observation space."
             logger.log(_log_level(2), log_message)
-            state_in_obsspace, state_analysis = model.state_to_observation(state_analysis)
+            state_in_obsspace_out = model.state_to_observation(state_analysis)
+            if is_crenkf:
+                state_in_obsspace = state_in_obsspace_out
+            else:
+                state_in_obsspace, state_analysis = state_in_obsspace_out
             if inputs_dafi['save_level'] in {'iter', 'debug'}:
                 dir = os.path.join(tdir, 'Hx')
                 file = 'Hxa'
